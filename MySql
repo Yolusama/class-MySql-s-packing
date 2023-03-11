@@ -1,0 +1,93 @@
+﻿// pch.h: 这是预编译标头文件。
+// 下方列出的文件仅编译一次，提高了将来生成的生成性能。
+// 这还将影响 IntelliSense 性能，包括代码完成和许多代码浏览功能。
+// 但是，如果此处列出的文件中的任何一个在生成之间有更新，它们全部都将被重新编译。
+// 请勿在此处添加要频繁更新的文件，这将使得性能优势无效。
+
+#ifndef PCH_H
+#define PCH_H
+
+// 添加要在此处预编译的标头
+#include "framework.h"
+#include<mysql.h>
+#include<string_view>
+#include<list>
+#include<iostream>
+namespace MySql_Con {
+	using String = std::string_view;
+
+	_declspec(dllexport) class MySqlCommand;
+
+	class _declspec(dllexport) MySqlDataReader {
+		MYSQL_RES* res;
+		MYSQL_ROW row;
+	public:
+		MySqlDataReader(MYSQL_RES* res = nullptr) :res(res) {}
+		std::list<String> fields_name();
+		bool read();
+		int count();
+		void close();
+		String getString(unsigned index);
+		String operator [](unsigned index) {
+			return getString(index);
+		}
+	};
+	class _declspec(dllexport) MySql
+	{
+		MYSQL mysql;
+	private:
+		String host;
+		String user;
+		String pwd;
+		String database;
+		String socket = "";
+		unsigned port;
+	private:
+		String error(MYSQL* con) { return String(mysql_error(con)); }
+	public:
+		explicit MySql();
+		//构造MySql连接并将连接完成
+		explicit MySql(String host, String user, String pwd, String database, unsigned port, String socket = "", size_t flag = 0);
+		void SetCharset(String charset = "utf8");
+		void SetOption(mysql_option opt, String option);
+		void Connect(String socket = "", size_t clientflag = 0) {
+			if (mysql_real_connect(&mysql, host.data(), user.data(), pwd.data(), database.data(), port, socket.data(), clientflag) == NULL)
+				std::cout << error(&mysql);
+		}
+		void setHost(String host) { this->host = host; }
+		void setUserID(String user) { this->user = user; }
+		void setUserPwd(String password) { this->pwd = password; }
+		void setDataBase(String database) { this->database = database; }
+		void setPort(unsigned port) { this->port = port; }
+		void setSocket(String socket) { this->socket = socket; }
+		bool commit() { return mysql_commit(&mysql); }
+		//mode值为0或1表示是否启用auto模式
+		bool autocommit(bool mode) { return mysql_autocommit(&mysql, mode); }
+		void Close() {
+			mysql_close(&mysql);
+		}
+		int MySqlQuery(String query);
+		MySqlDataReader LastExeResult()
+		{
+			return MySqlDataReader(mysql_store_result(&mysql));
+		}
+		String query_error() { return mysql_error(&mysql); }
+		MySqlCommand CreateCommnad();
+	};
+	class _declspec(dllexport) MySqlCommand
+	{
+		String commandText = "";
+		MySqlDataReader reader;
+	public:
+		MySql con;
+		MySqlCommand() {}
+		//以连接后的MySql连接作为构造参数
+		MySqlCommand(String command, MySql conection);
+		void SetCommandText(String command) { commandText = command; }
+		int execQuery();
+		MySqlDataReader DataReader() { return reader; }
+		bool startCommit() { return con.commit(); }
+		bool startAutoCommit(bool mode) { return con.autocommit(mode); }
+	};
+}
+#endif //PCH_H
